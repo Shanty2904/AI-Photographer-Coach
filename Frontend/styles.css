@@ -1,0 +1,278 @@
+:root {
+  --ink: #f7f7f2;
+  --muted: rgba(247, 247, 242, 0.72);
+  --panel: rgba(10, 12, 12, 0.72);
+  --panel-strong: rgba(10, 12, 12, 0.86);
+  --line: rgba(255, 255, 255, 0.2);
+  --ready: #43e07d;
+  --warn: #ffcf5a;
+  --alert: #ff6868;
+  --accent: #4db5ff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+  background: #050606;
+  color: var(--ink);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.camera-shell {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  background: #050606;
+}
+
+#camera {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #050606;
+}
+
+#frameCanvas {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.camera-shell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.68) 0%, rgba(0, 0, 0, 0.08) 38%, rgba(0, 0, 0, 0.7) 100%),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.46), transparent 34%, transparent 66%, rgba(0, 0, 0, 0.32));
+}
+
+.top-strip,
+.coach-panel,
+.control-bar {
+  position: absolute;
+  z-index: 2;
+}
+
+.top-strip {
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px;
+}
+
+.eyebrow {
+  margin: 0 0 5px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(34px, 6vw, 72px);
+  line-height: 0.95;
+  letter-spacing: 0;
+}
+
+.status-pill {
+  max-width: 240px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 10px 12px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  text-align: right;
+  backdrop-filter: blur(14px);
+}
+
+.status-pill.ready {
+  color: var(--ready);
+}
+
+.status-pill.error {
+  color: var(--alert);
+}
+
+.coach-panel {
+  left: 20px;
+  right: 20px;
+  bottom: 92px;
+  max-width: 760px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  padding: 18px;
+  backdrop-filter: blur(16px);
+}
+
+.readiness {
+  width: fit-content;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12);
+  padding: 7px 10px;
+  color: var(--warn);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.readiness.ready {
+  color: var(--ready);
+}
+
+.coach-message {
+  margin: 12px 0 14px;
+  max-width: 680px;
+  font-size: clamp(24px, 4vw, 42px);
+  line-height: 1.08;
+  font-weight: 900;
+}
+
+.meter {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.meter-fill {
+  width: 0%;
+  height: 100%;
+  border-radius: 8px;
+  background: var(--accent);
+  transition: width 180ms ease, background 180ms ease;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(86px, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.metrics-grid div {
+  min-height: 64px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px;
+}
+
+.metrics-grid span,
+.control-bar label {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.metrics-grid strong {
+  display: block;
+  margin-top: 6px;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 18px;
+  line-height: 1.05;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.control-bar {
+  left: 20px;
+  right: 20px;
+  bottom: 20px;
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto auto;
+  gap: 10px;
+  max-width: 760px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 10px;
+  backdrop-filter: blur(16px);
+}
+
+.control-bar input {
+  width: 100%;
+  margin-top: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--ink);
+  padding: 10px;
+  outline: none;
+}
+
+.control-bar button {
+  min-width: 112px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--ink);
+  color: #080909;
+  padding: 10px 14px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.control-bar button.secondary {
+  background: var(--accent);
+}
+
+@media (max-width: 760px) {
+  .top-strip {
+    padding: 14px;
+  }
+
+  .status-pill {
+    max-width: 170px;
+    font-size: 12px;
+  }
+
+  .coach-panel {
+    left: 12px;
+    right: 12px;
+    bottom: 164px;
+    padding: 14px;
+  }
+
+  .metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .control-bar {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .control-bar label {
+    grid-column: 1 / -1;
+  }
+}

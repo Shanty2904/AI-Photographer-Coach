@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI Photographer Coach</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="camera-shell">
+      <video id="camera" autoplay playsinline muted></video>
+      <canvas id="frameCanvas" width="640" height="480" aria-hidden="true"></canvas>
+
+      <section class="top-strip" aria-label="Connection">
+        <div>
+          <p class="eyebrow">AI Photographer Coach</p>
+          <h1>Frame the shot.</h1>
+        </div>
+        <div class="status-pill" id="serverStatus">Checking backend</div>
+      </section>
+
+      <section class="coach-panel" aria-live="polite">
+        <div class="readiness" id="readyState">Waiting for camera</div>
+        <p class="coach-message" id="coachMessage">Allow camera access to start live coaching.</p>
+        <div class="meter">
+          <div class="meter-fill" id="scoreMeter"></div>
+        </div>
+        <div class="metrics-grid">
+          <div>
+            <span>Score</span>
+            <strong id="scoreValue">--</strong>
+          </div>
+          <div>
+            <span>Grade</span>
+            <strong id="gradeValue">--</strong>
+          </div>
+          <div>
+            <span>Fix</span>
+            <strong id="weakestValue">Live</strong>
+          </div>
+          <div>
+            <span>Camera FPS</span>
+            <strong id="captureFps">--</strong>
+          </div>
+          <div>
+            <span>Analysis FPS</span>
+            <strong id="analysisFps">--</strong>
+          </div>
+          <div>
+            <span>Latency</span>
+            <strong id="latencyValue">--</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="control-bar" aria-label="Controls">
+        <label>
+          Backend
+          <input id="backendUrl" type="url" value="http://localhost:8000" />
+        </label>
+        <button id="connectButton" type="button">Connect</button>
+        <button id="cameraButton" type="button">Start camera</button>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
