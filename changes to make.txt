@@ -1,0 +1,4 @@
+UI changes. (home page!!)
+front camera not detecting
+single suggestion for a specific interval. user can skip, or adjust. if adjustment detected, next suggestion should be relevant to the new position or zoom level.
+skip button for suggestions
