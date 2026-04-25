@@ -1,4 +1,43 @@
-INFO:     Started server process [8376]
+INFO:     Started server process [5788]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:55639 - "WebSocket /ws/live" [accepted]
+INFO:     connection open
+INFO:     10.225.106.44:33090 - "WebSocket /ws/live" [accepted]
+INFO:     connection open
+INFO:     10.225.106.44:58342 - "WebSocket /ws/live" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     10.225.106.134:43528 - "WebSocket /ws/live" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     10.225.106.134:38006 - "WebSocket /ws/live" [accepted]
+INFO:     connection open
+INFO:     10.225.106.44:47624 - "WebSocket /ws/live" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     10.225.106.44:49638 - "WebSocket /ws/live" [accepted]
+INFO:     connection closed
+INFO:     connection closed
+INFO:     10.225.106.44:39026 - "WebSocket /ws/live" [accepted]
+INFO:     connection open
+INFO:     10.225.106.44:44362 - "WebSocket /ws/live" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     10.225.106.44:58752 - "WebSocket /ws/live" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     10.225.106.44:48260 - "WebSocket /ws/live" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     connection closed
+INFO:     127.0.0.1:53519 - "WebSocket /ws/live" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [5788]

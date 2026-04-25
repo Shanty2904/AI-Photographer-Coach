@@ -3,64 +3,207 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>AI Photographer Coach</title>
+    <title>AI Photographer Coach — Live Frame Analysis</title>
+    <meta name="description" content="Point your camera at any scene and receive real-time AI coaching on composition, lighting, sharpness and more." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <main class="camera-shell">
-      <video id="camera" autoplay playsinline muted></video>
+
+    <!-- ═══════════════════════════════════════════════
+         LIVE CAMERA FEED — fills the entire viewport
+    ═══════════════════════════════════════════════ -->
+    <main class="camera-shell" id="cameraShell">
+      <video id="camera" autoplay playsinline muted aria-label="Live camera feed"></video>
+
+      <!-- Hidden canvas used only for frame capture — never visible -->
       <canvas id="frameCanvas" width="640" height="480" aria-hidden="true"></canvas>
 
-      <section class="top-strip" aria-label="Connection">
-        <div>
-          <p class="eyebrow">AI Photographer Coach</p>
-          <h1>Frame the shot.</h1>
+      <!-- ── Viewfinder overlay grid (rule-of-thirds guide) ── -->
+      <div class="viewfinder-grid" id="viewfinderGrid" aria-hidden="true">
+        <div class="vf-line vf-v1"></div>
+        <div class="vf-line vf-v2"></div>
+        <div class="vf-line vf-h1"></div>
+        <div class="vf-line vf-h2"></div>
+        <div class="vf-corner vf-tl"></div>
+        <div class="vf-corner vf-tr"></div>
+        <div class="vf-corner vf-bl"></div>
+        <div class="vf-corner vf-br"></div>
+      </div>
+
+      <!-- Vignette + gradient overlays so text remains legible -->
+      <div class="vignette" aria-hidden="true"></div>
+
+
+      <!-- ════════════════════════════════════════════
+           TOP BAR — App identity + connection status
+      ════════════════════════════════════════════ -->
+      <header class="top-bar" role="banner">
+        <div class="app-identity">
+          <div class="app-logo" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+              <circle cx="11" cy="11" r="9" stroke="currentColor" stroke-width="1.5"/>
+              <circle cx="11" cy="11" r="4" fill="currentColor"/>
+              <path d="M11 2v2M11 18v2M2 11h2M18 11h2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div>
+            <p class="app-eyebrow">AI Photographer Coach</p>
+            <p class="app-tagline">Live frame analysis</p>
+          </div>
         </div>
-        <div class="status-pill" id="serverStatus">Checking backend</div>
+
+        <!-- Connection badge — shows whether the AI backend is reachable -->
+        <div class="connection-badge" id="serverStatus" role="status" aria-live="polite">
+          <span class="badge-dot" id="statusDot"></span>
+          <span class="badge-text" id="statusText">Checking AI engine…</span>
+        </div>
+      </header>
+
+
+      <!-- ════════════════════════════════════════════
+           SHOT READINESS — centre-screen, appears over the feed
+      ════════════════════════════════════════════ -->
+      <div class="readiness-badge" id="readinessBadge" aria-live="assertive" aria-label="Shot readiness">
+        <span class="readiness-icon" id="readinessIcon">⏳</span>
+        <span class="readiness-label" id="readinessLabel">Waiting for camera</span>
+      </div>
+
+
+      <!-- ════════════════════════════════════════════
+           SCORE ARC — circular score indicator (right side)
+      ════════════════════════════════════════════ -->
+      <aside class="score-arc-panel" aria-label="Overall shot score">
+        <div class="arc-wrapper">
+          <svg class="arc-svg" viewBox="0 0 80 80" aria-hidden="true">
+            <circle class="arc-track" cx="40" cy="40" r="32"/>
+            <circle class="arc-fill" id="arcFill" cx="40" cy="40" r="32"
+                    stroke-dasharray="201 201"
+                    stroke-dashoffset="201"/>
+          </svg>
+          <div class="arc-center">
+            <strong class="arc-score" id="scoreValue">--</strong>
+            <span class="arc-label">/ 10</span>
+          </div>
+        </div>
+        <p class="arc-grade" id="gradeValue">--</p>
+        <p class="arc-caption">Shot score</p>
+      </aside>
+
+
+      <!-- ════════════════════════════════════════════
+           COACH PANEL — main coaching message + detailed metrics
+      ════════════════════════════════════════════ -->
+      <section class="coach-panel" aria-label="Live coaching feedback" aria-live="polite">
+
+        <!-- Primary coaching tip -->
+        <div class="coach-tip-row">
+          <div class="tip-icon" aria-hidden="true">💡</div>
+          <div class="tip-body">
+            <p class="tip-label">Coach says</p>
+            <p class="coach-message" id="coachMessage">Allow camera access to start live coaching.</p>
+          </div>
+        </div>
+
+        <!-- Score bar -->
+        <div class="score-bar-row" aria-label="Score progress bar">
+          <span class="score-bar-label">Score</span>
+          <div class="score-bar-track">
+            <div class="score-bar-fill" id="scoreMeter"></div>
+          </div>
+          <span class="score-bar-val" id="scoreBarVal">0 / 10</span>
+        </div>
+
+        <!-- Weakest category callout -->
+        <div class="focus-tag-row">
+          <span class="focus-tag-label">Focus on →</span>
+          <span class="focus-tag" id="weakestValue">–</span>
+        </div>
+
+        <!-- Detailed metrics grid -->
+        <div class="metrics-section">
+          <p class="metrics-heading">Performance details</p>
+          <div class="metrics-grid">
+            <div class="metric-card" id="mc-captureFps">
+              <span class="metric-icon" aria-hidden="true">🎥</span>
+              <strong class="metric-val" id="captureFps">--</strong>
+              <span class="metric-name">Camera FPS</span>
+              <span class="metric-hint">Frames captured per second by your device</span>
+            </div>
+            <div class="metric-card" id="mc-analysisFps">
+              <span class="metric-icon" aria-hidden="true">🤖</span>
+              <strong class="metric-val" id="analysisFps">--</strong>
+              <span class="metric-name">AI Analysis FPS</span>
+              <span class="metric-hint">Frames the AI engine processes per second</span>
+            </div>
+            <div class="metric-card" id="mc-latency">
+              <span class="metric-icon" aria-hidden="true">⚡</span>
+              <strong class="metric-val" id="latencyValue">--</strong>
+              <span class="metric-name">Response Time</span>
+              <span class="metric-hint">Round-trip time from camera to AI result</span>
+            </div>
+          </div>
+        </div>
+
       </section>
 
-      <section class="coach-panel" aria-live="polite">
-        <div class="readiness" id="readyState">Waiting for camera</div>
-        <p class="coach-message" id="coachMessage">Allow camera access to start live coaching.</p>
-        <div class="meter">
-          <div class="meter-fill" id="scoreMeter"></div>
-        </div>
-        <div class="metrics-grid">
-          <div>
-            <span>Score</span>
-            <strong id="scoreValue">--</strong>
-          </div>
-          <div>
-            <span>Grade</span>
-            <strong id="gradeValue">--</strong>
-          </div>
-          <div>
-            <span>Fix</span>
-            <strong id="weakestValue">Live</strong>
-          </div>
-          <div>
-            <span>Camera FPS</span>
-            <strong id="captureFps">--</strong>
-          </div>
-          <div>
-            <span>Analysis FPS</span>
-            <strong id="analysisFps">--</strong>
-          </div>
-          <div>
-            <span>Latency</span>
-            <strong id="latencyValue">--</strong>
-          </div>
-        </div>
-      </section>
 
-      <section class="control-bar" aria-label="Controls">
-        <label>
-          Backend
-          <input id="backendUrl" type="url" value="http://localhost:8000" />
-        </label>
-        <button id="connectButton" type="button">Connect</button>
-        <button id="cameraButton" type="button">Start camera</button>
-      </section>
+      <!-- ════════════════════════════════════════════
+           SETUP PANEL — shown only before camera starts
+           Guides the user step-by-step
+      ════════════════════════════════════════════ -->
+      <div class="setup-panel" id="setupPanel">
+        <div class="setup-inner">
+          <h1 class="setup-title">Frame the shot.</h1>
+          <p class="setup-subtitle">Point your camera — the AI will coach you in real time.</p>
+
+          <ol class="setup-steps" aria-label="Setup steps">
+            <li class="setup-step" id="step1">
+              <span class="step-num">1</span>
+              <div class="step-body">
+                <strong>Connect to AI engine</strong>
+                <p>Enter the address of the backend server running on your PC.</p>
+                <div class="step-input-row">
+                  <label for="backendUrl" class="sr-only">Backend server URL</label>
+                  <input id="backendUrl" type="url" placeholder="http://localhost:8000" autocomplete="off" spellcheck="false" />
+                  <button id="connectButton" type="button">Connect</button>
+                </div>
+              </div>
+            </li>
+            <li class="setup-step" id="step2">
+              <span class="step-num">2</span>
+              <div class="step-body">
+                <strong>Enable your camera</strong>
+                <p>Grant camera permission so the coach can analyse your frame.</p>
+                <button id="cameraButton" type="button" class="btn-primary">Start camera</button>
+              </div>
+            </li>
+          </ol>
+        </div>
+      </div>
+
+
+      <!-- ════════════════════════════════════════════
+           FLOATING ACTION CONTROLS — shown while camera is live
+      ════════════════════════════════════════════ -->
+      <nav class="float-controls" id="floatControls" aria-label="Camera controls" style="display:none">
+        <button id="switchCameraButton" type="button" class="fab" aria-label="Switch camera lens" title="Switch lens">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 7h-9m0 0l3-3m-3 3l3 3M4 17h9m0 0l-3 3m3-3l-3-3"/>
+          </svg>
+          <span>Switch lens</span>
+        </button>
+        <button id="reconnectButton" type="button" class="fab fab-secondary" aria-label="Reconnect to AI engine" title="Reconnect AI">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+          </svg>
+          <span>Reconnect AI</span>
+        </button>
+      </nav>
+
     </main>
 
     <script src="app.js"></script>

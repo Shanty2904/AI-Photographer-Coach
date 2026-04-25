@@ -1,278 +1,763 @@
+/* ═══════════════════════════════════════════════════════════════
+   AI PHOTOGRAPHER COACH — Premium dark UI
+   Design: dark glassmorphism, accent blue, animated meter, arc
+═══════════════════════════════════════════════════════════════ */
+
+/* ── Design tokens ────────────────────────────────────────────── */
 :root {
-  --ink: #f7f7f2;
-  --muted: rgba(247, 247, 242, 0.72);
-  --panel: rgba(10, 12, 12, 0.72);
-  --panel-strong: rgba(10, 12, 12, 0.86);
-  --line: rgba(255, 255, 255, 0.2);
-  --ready: #43e07d;
-  --warn: #ffcf5a;
-  --alert: #ff6868;
-  --accent: #4db5ff;
+  --ink:          #f0f0ec;
+  --ink-dim:      rgba(240, 240, 236, 0.62);
+  --ink-ghost:    rgba(240, 240, 236, 0.36);
+  --bg:           #07090a;
+  --panel:        rgba(10, 14, 16, 0.76);
+  --panel-heavy:  rgba(7,  10, 12, 0.88);
+  --glass:        rgba(255, 255, 255, 0.06);
+  --glass-hover:  rgba(255, 255, 255, 0.10);
+  --border:       rgba(255, 255, 255, 0.10);
+  --border-glow:  rgba(77, 181, 255, 0.30);
+
+  --accent:       #4db5ff;
+  --accent-glow:  rgba(77, 181, 255, 0.18);
+  --ready:        #3de87a;
+  --ready-glow:   rgba(61, 232, 122, 0.18);
+  --warn:         #ffcf5a;
+  --warn-glow:    rgba(255, 207, 90, 0.18);
+  --danger:       #ff6868;
+  --danger-glow:  rgba(255, 104, 104, 0.18);
+
+  --radius:       12px;
+  --radius-sm:    8px;
+  --radius-pill:  99px;
+
+  --blur:         blur(20px) saturate(160%);
+  --blur-heavy:   blur(28px) saturate(180%);
+
+  --transition:   160ms cubic-bezier(.4, 0, .2, 1);
+  --font:         'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 
-* {
-  box-sizing: border-box;
-}
+/* ── Reset ────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-html,
-body {
-  width: 100%;
-  min-height: 100%;
-  margin: 0;
-  background: #050606;
+html, body {
+  width: 100%; height: 100%;
+  background: var(--bg);
   color: var(--ink);
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-button,
-input {
-  font: inherit;
+button, input { font: inherit; }
+
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0);
+  white-space: nowrap; border: 0;
 }
 
+
+/* ═══════════════════════════════════════════════════════════════
+   CAMERA SHELL
+═══════════════════════════════════════════════════════════════ */
 .camera-shell {
   position: relative;
-  min-height: 100vh;
+  width: 100vw;
+  height: 100dvh;
   overflow: hidden;
-  background: #050606;
+  background: var(--bg);
 }
 
 #camera {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
+  width: 100%; height: 100%;
   object-fit: cover;
-  background: #050606;
+  background: #0a0c0e;
 }
 
 #frameCanvas {
   position: absolute;
-  width: 1px;
-  height: 1px;
+  width: 1px; height: 1px;
   opacity: 0;
   pointer-events: none;
 }
 
-.camera-shell::after {
-  content: "";
+
+/* ── Vignette ─────────────────────────────────────────────────── */
+.vignette {
   position: absolute;
   inset: 0;
   pointer-events: none;
+  z-index: 1;
   background:
-    linear-gradient(180deg, rgba(0, 0, 0, 0.68) 0%, rgba(0, 0, 0, 0.08) 38%, rgba(0, 0, 0, 0.7) 100%),
-    linear-gradient(90deg, rgba(0, 0, 0, 0.46), transparent 34%, transparent 66%, rgba(0, 0, 0, 0.32));
+    linear-gradient(180deg,
+      rgba(0,0,0,.72) 0%,
+      rgba(0,0,0,.02) 32%,
+      rgba(0,0,0,.02) 58%,
+      rgba(0,0,0,.80) 100%),
+    linear-gradient(90deg,
+      rgba(0,0,0,.42), transparent 30%,
+      transparent 70%, rgba(0,0,0,.32));
 }
 
-.top-strip,
+
+/* ── Rule-of-thirds viewfinder grid ──────────────────────────── */
+.viewfinder-grid {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 600ms ease;
+}
+.viewfinder-grid.visible { opacity: 1; }
+
+.vf-line {
+  position: absolute;
+  background: rgba(255,255,255,.12);
+}
+.vf-v1 { left: 33.33%; top: 0; width: 1px; height: 100%; }
+.vf-v2 { left: 66.66%; top: 0; width: 1px; height: 100%; }
+.vf-h1 { top: 33.33%; left: 0; width: 100%; height: 1px; }
+.vf-h2 { top: 66.66%; left: 0; width: 100%; height: 1px; }
+
+/* Corner brackets */
+.vf-corner {
+  position: absolute;
+  width: 22px; height: 22px;
+  border-color: rgba(255,255,255,.55);
+  border-style: solid;
+}
+.vf-tl { top: 14%; left: 12%; border-width: 2px 0 0 2px; }
+.vf-tr { top: 14%; right: 12%; border-width: 2px 2px 0 0; }
+.vf-bl { bottom: 14%; left: 12%; border-width: 0 0 2px 2px; }
+.vf-br { bottom: 14%; right: 12%; border-width: 0 2px 2px 0; }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   ALL OVERLAYS — z-index stack above camera + vignette
+═══════════════════════════════════════════════════════════════ */
+.top-bar,
+.readiness-badge,
+.score-arc-panel,
 .coach-panel,
-.control-bar {
+.float-controls {
   position: absolute;
   z-index: 2;
 }
 
-.top-strip {
-  top: 0;
-  left: 0;
-  right: 0;
+/* Top bar + float controls must sit above the setup panel overlay */
+.top-bar        { z-index: 10; }
+.float-controls { z-index: 10; }
+
+/* Setup panel sits above camera but below top-bar */
+.setup-panel { position: absolute; z-index: 5; }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   TOP BAR — identity + connection badge
+═══════════════════════════════════════════════════════════════ */
+.top-bar {
+  top: 0; left: 0; right: 0;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 20px;
+  padding: 18px 22px;
 }
 
-.eyebrow {
-  margin: 0 0 5px;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0;
-  text-transform: uppercase;
+.app-identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
-h1 {
-  margin: 0;
-  font-size: clamp(34px, 6vw, 72px);
-  line-height: 0.95;
-  letter-spacing: 0;
+.app-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  background: var(--glass);
+  border: 1px solid var(--border);
+  backdrop-filter: var(--blur);
+  color: var(--accent);
+  flex-shrink: 0;
 }
 
-.status-pill {
-  max-width: 240px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--panel);
-  padding: 10px 12px;
-  color: var(--muted);
+.app-eyebrow {
   font-size: 13px;
-  font-weight: 800;
-  text-align: right;
-  backdrop-filter: blur(14px);
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: .01em;
 }
-
-.status-pill.ready {
-  color: var(--ready);
-}
-
-.status-pill.error {
-  color: var(--alert);
-}
-
-.coach-panel {
-  left: 20px;
-  right: 20px;
-  bottom: 92px;
-  max-width: 760px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--panel-strong);
-  padding: 18px;
-  backdrop-filter: blur(16px);
-}
-
-.readiness {
-  width: fit-content;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.12);
-  padding: 7px 10px;
-  color: var(--warn);
-  font-size: 12px;
-  font-weight: 900;
+.app-tagline {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-dim);
+  margin-top: 1px;
   text-transform: uppercase;
+  letter-spacing: .06em;
 }
 
-.readiness.ready {
+/* Connection badge */
+.connection-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: var(--radius-pill);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  backdrop-filter: var(--blur);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-dim);
+  transition: border-color var(--transition), color var(--transition);
+}
+.connection-badge.ready {
+  border-color: rgba(61, 232, 122, 0.30);
   color: var(--ready);
 }
+.connection-badge.error {
+  border-color: rgba(255, 104, 104, 0.30);
+  color: var(--danger);
+}
 
-.coach-message {
-  margin: 12px 0 14px;
-  max-width: 680px;
-  font-size: clamp(24px, 4vw, 42px);
-  line-height: 1.08;
+.badge-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: .4; }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   SHOT READINESS BADGE — centred, large, decisive
+═══════════════════════════════════════════════════════════════ */
+.readiness-badge {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+.readiness-badge.visible { opacity: 1; }
+
+.readiness-icon {
+  font-size: 40px;
+  filter: drop-shadow(0 0 12px rgba(0,0,0,.8));
+  transition: var(--transition);
+}
+.readiness-label {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  padding: 6px 18px;
+  border-radius: var(--radius-pill);
+  background: var(--panel-heavy);
+  border: 1px solid var(--border);
+  backdrop-filter: var(--blur);
+  color: var(--warn);
+  transition: color var(--transition), border-color var(--transition), background var(--transition);
+}
+.readiness-badge.ready .readiness-label {
+  color: var(--ready);
+  border-color: rgba(61, 232, 122, 0.30);
+  background: rgba(61, 232, 122, 0.08);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   SCORE ARC — right side floating card
+═══════════════════════════════════════════════════════════════ */
+.score-arc-panel {
+  right: 22px;
+  bottom: 120px;
+  width: 108px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 18px 14px 14px;
+  border-radius: var(--radius);
+  background: var(--panel-heavy);
+  border: 1px solid var(--border);
+  backdrop-filter: var(--blur-heavy);
+  text-align: center;
+}
+
+/* Wrapper so arc-center can be centred over the SVG */
+.arc-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.arc-svg {
+  width: 80px; height: 80px;
+  transform: rotate(-90deg);
+}
+.arc-track {
+  fill: none;
+  stroke: rgba(255,255,255,.10);
+  stroke-width: 5;
+}
+.arc-fill {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 5;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 300ms cubic-bezier(.4,0,.2,1),
+              stroke 300ms ease;
+}
+.arc-fill.ready  { stroke: var(--ready); }
+.arc-fill.warn   { stroke: var(--warn); }
+.arc-fill.danger { stroke: var(--danger); }
+
+.arc-center {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  pointer-events: none;
+}
+.arc-score {
+  font-size: 22px;
   font-weight: 900;
+  color: var(--ink);
+  line-height: 1;
+}
+.arc-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ink-ghost);
+}
+.arc-grade {
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--accent);
+  letter-spacing: .02em;
+  transition: color var(--transition);
+}
+.arc-grade.ready-color  { color: var(--ready); }
+.arc-grade.warn-color   { color: var(--warn); }
+.arc-grade.danger-color { color: var(--danger); }
+.arc-caption {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ink-ghost);
+  text-transform: uppercase;
+  letter-spacing: .06em;
 }
 
-.meter {
-  height: 8px;
+/* The panel itself is already in the absolute z-index stack via the shared rule above */
+
+
+/* ═══════════════════════════════════════════════════════════════
+   COACH PANEL — bottom left, main coaching area
+═══════════════════════════════════════════════════════════════ */
+.coach-panel {
+  left: 22px;
+  right: 148px;    /* leave room for the score arc */
+  bottom: 22px;
+  max-width: 680px;
+  border-radius: var(--radius);
+  background: var(--panel-heavy);
+  border: 1px solid var(--border);
+  backdrop-filter: var(--blur-heavy);
+  padding: 18px 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Coaching tip row */
+.coach-tip-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.tip-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.tip-body { flex: 1; min-width: 0; }
+.tip-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--ink-ghost);
+  margin-bottom: 4px;
+}
+.coach-message {
+  font-size: clamp(15px, 2.2vw, 22px);
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--ink);
+}
+
+/* Score bar */
+.score-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.score-bar-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--ink-ghost);
+  width: 38px;
+  flex-shrink: 0;
+}
+.score-bar-track {
+  flex: 1;
+  height: 5px;
+  border-radius: var(--radius-pill);
+  background: rgba(255,255,255,.10);
   overflow: hidden;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.16);
 }
-
-.meter-fill {
+.score-bar-fill {
   width: 0%;
   height: 100%;
-  border-radius: 8px;
+  border-radius: var(--radius-pill);
   background: var(--accent);
-  transition: width 180ms ease, background 180ms ease;
+  transition: width 220ms cubic-bezier(.4,0,.2,1),
+              background 220ms ease;
+}
+.score-bar-val {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-dim);
+  flex-shrink: 0;
+  width: 50px;
+  text-align: right;
 }
 
+/* Focus tag */
+.focus-tag-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.focus-tag-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-ghost);
+}
+.focus-tag {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 207, 90, 0.12);
+  border: 1px solid rgba(255, 207, 90, 0.28);
+  color: var(--warn);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: capitalize;
+  letter-spacing: .02em;
+  transition: var(--transition);
+}
+
+/* Metrics section */
+.metrics-section { display: flex; flex-direction: column; gap: 8px; }
+.metrics-heading {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--ink-ghost);
+}
 .metrics-grid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(86px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 8px;
-  margin-top: 14px;
 }
-
-.metrics-grid div {
-  min-height: 64px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 9px;
+.metric-card {
+  border-radius: var(--radius-sm);
+  background: var(--glass);
+  border: 1px solid var(--border);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  cursor: default;
+  transition: background var(--transition), border-color var(--transition);
+  position: relative;
 }
-
-.metrics-grid span,
-.control-bar label {
-  display: block;
-  color: var(--muted);
-  font-size: 11px;
+.metric-card:hover { background: var(--glass-hover); }
+.metric-icon { font-size: 14px; margin-bottom: 2px; }
+.metric-val {
+  font-size: 17px;
   font-weight: 800;
+  color: var(--ink);
+  line-height: 1;
+}
+.metric-name {
+  font-size: 10px;
+  font-weight: 700;
   text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--ink-dim);
+  margin-top: 2px;
 }
-
-.metrics-grid strong {
-  display: block;
-  margin-top: 6px;
-  overflow: hidden;
-  color: var(--ink);
-  font-size: 18px;
-  line-height: 1.05;
-  font-weight: 900;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.control-bar {
-  left: 20px;
-  right: 20px;
-  bottom: 20px;
-  display: grid;
-  grid-template-columns: minmax(180px, 1fr) auto auto;
-  gap: 10px;
-  max-width: 760px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--panel);
-  padding: 10px;
-  backdrop-filter: blur(16px);
-}
-
-.control-bar input {
-  width: 100%;
+.metric-hint {
+  font-size: 10px;
+  color: var(--ink-ghost);
+  line-height: 1.35;
   margin-top: 4px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--ink);
-  padding: 10px;
-  outline: none;
 }
 
-.control-bar button {
-  min-width: 112px;
-  border: 0;
-  border-radius: 8px;
-  background: var(--ink);
-  color: #080909;
-  padding: 10px 14px;
+
+/* ═══════════════════════════════════════════════════════════════
+   SETUP PANEL — shown before camera is started
+═══════════════════════════════════════════════════════════════ */
+.setup-panel {
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(7, 9, 10, 0.82);
+  backdrop-filter: blur(8px);
+  padding: 20px;
+}
+.setup-panel.hidden { display: none; }
+
+.setup-inner {
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.setup-title {
+  font-size: clamp(36px, 7vw, 64px);
   font-weight: 900;
+  line-height: .95;
+  letter-spacing: -.02em;
+  color: var(--ink);
+}
+.setup-subtitle {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ink-dim);
+  margin-top: -14px;
+  line-height: 1.5;
+}
+
+.setup-steps {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.setup-step {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 18px;
+  border-radius: var(--radius);
+  background: var(--glass);
+  border: 1px solid var(--border);
+  backdrop-filter: var(--blur);
+  transition: border-color var(--transition);
+}
+.setup-step.done {
+  border-color: rgba(61, 232, 122, 0.30);
+  background: rgba(61, 232, 122, 0.05);
+}
+
+.step-num {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: var(--accent-glow);
+  border: 1px solid rgba(77, 181, 255, 0.35);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.setup-step.done .step-num {
+  background: var(--ready-glow);
+  border-color: rgba(61, 232, 122, 0.40);
+  color: var(--ready);
+}
+
+.step-body { flex: 1; min-width: 0; }
+.step-body strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+.step-body p {
+  font-size: 12px;
+  color: var(--ink-dim);
+  line-height: 1.45;
+  margin-bottom: 10px;
+}
+
+.step-input-row {
+  display: flex;
+  gap: 8px;
+}
+.step-input-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  background: rgba(255,255,255,.07);
+  border: 1px solid var(--border);
+  color: var(--ink);
+  font-size: 13px;
+  outline: none;
+  transition: border-color var(--transition), background var(--transition);
+}
+.step-input-row input:focus {
+  border-color: var(--accent);
+  background: rgba(77, 181, 255, 0.07);
+}
+.step-input-row input::placeholder { color: var(--ink-ghost); }
+
+button {
   cursor: pointer;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 9px 18px;
+  font-size: 13px;
+  font-weight: 700;
+  background: var(--ink);
+  color: #07090a;
+  transition: opacity var(--transition), transform var(--transition);
 }
+button:hover  { opacity: .85; }
+button:active { transform: scale(.97); }
 
-.control-bar button.secondary {
+.btn-primary {
   background: var(--accent);
+  color: #07090a;
 }
 
-@media (max-width: 760px) {
-  .top-strip {
-    padding: 14px;
+
+/* ═══════════════════════════════════════════════════════════════
+   FLOATING ACTION CONTROLS — when camera is live
+═══════════════════════════════════════════════════════════════ */
+.float-controls {
+  bottom: 22px;
+  right: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.fab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: var(--radius-pill);
+  background: var(--panel-heavy);
+  border: 1px solid var(--border);
+  backdrop-filter: var(--blur);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  transition: background var(--transition), border-color var(--transition), transform var(--transition);
+}
+.fab:hover  { background: var(--glass-hover); border-color: rgba(255,255,255,.20); }
+.fab:active { transform: scale(.96); }
+.fab-secondary { color: var(--accent); border-color: rgba(77, 181, 255, 0.25); }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   MOBILE  ≤ 768px wide  or  ≤ 640px tall
+═══════════════════════════════════════════════════════════════ */
+@media (max-width: 768px), (max-height: 640px) {
+
+  /* Hide app identity text on tiny screens */
+  .app-tagline { display: none; }
+
+  /* Slimmer connection badge */
+  .connection-badge {
+    font-size: 11px;
+    padding: 6px 10px;
   }
 
-  .status-pill {
-    max-width: 170px;
-    font-size: 12px;
+  /* Score arc: move to top-right inline with badge, smaller */
+  .score-arc-panel {
+    top: 60px; right: 12px;
+    bottom: auto;
+    width: 88px;
+    padding: 12px 10px 10px;
   }
+  .arc-svg { width: 64px; height: 64px; }
+  .arc-score { font-size: 18px; }
+  .arc-grade { font-size: 16px; }
 
+  /* Coach panel: full-width strip at bottom */
   .coach-panel {
-    left: 12px;
+    left: 0; right: 0; bottom: 0;
+    max-width: none;
+    border-radius: 0;
+    border-left: none; border-right: none; border-bottom: none;
+    padding: 10px 16px 14px;
+    gap: 8px;
+  }
+
+  .tip-icon { display: none; }
+  .coach-message {
+    font-size: 14px;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    display: -webkit-box;
+    overflow: hidden;
+  }
+  .metrics-section { display: none; }
+
+  /* Readiness badge: smaller */
+  .readiness-icon { font-size: 28px; }
+  .readiness-label { font-size: 11px; padding: 4px 14px; }
+
+  /* Float controls: row at bottom */
+  .float-controls {
+    bottom: auto;
+    top: 10px;
     right: 12px;
-    bottom: 164px;
-    padding: 14px;
+    flex-direction: row;
   }
+  .fab span { display: none; }
+  .fab { padding: 9px; border-radius: 50%; }
+}
 
-  .metrics-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .control-bar {
-    left: 12px;
-    right: 12px;
-    bottom: 12px;
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .control-bar label {
-    grid-column: 1 / -1;
-  }
+@media (max-height: 460px) {
+  .readiness-badge { display: none; }
+  .score-arc-panel { display: none; }
+  .coach-panel { gap: 5px; padding: 7px 14px 10px; }
+  .score-bar-row, .focus-tag-row { display: none; }
 }

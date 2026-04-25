@@ -1,0 +1,203 @@
+[
+  {
+    "file": "sharp_tack.png",
+    "module": "sharpness",
+    "expected_label": "tack_sharp",
+    "expected_score_min": 9.0
+  },
+  {
+    "file": "sharp_fine.png",
+    "module": "sharpness",
+    "expected_label": "sharp",
+    "expected_score_min": 7.0
+  },
+  {
+    "file": "blurry.png",
+    "module": "sharpness",
+    "expected_label": "blurry",
+    "expected_score_max": 5.0
+  },
+  {
+    "file": "very_blurry.png",
+    "module": "sharpness",
+    "expected_label": "very_blurry",
+    "expected_score_max": 3.0
+  },
+  {
+    "file": "mb_none.png",
+    "module": "motion_blur",
+    "expected_label": "none",
+    "expected_score_min": 9.0
+  },
+  {
+    "file": "mb_horizontal.png",
+    "module": "motion_blur",
+    "expected_label": "motion_blur",
+    "expected_score_max": 5.0
+  },
+  {
+    "file": "noise_clean.png",
+    "module": "noise",
+    "expected_label": "clean",
+    "expected_score_min": 9.0
+  },
+  {
+    "file": "noise_noisy.png",
+    "module": "noise",
+    "expected_label": "noisy",
+    "expected_score_max": 7.0
+  },
+  {
+    "file": "noise_very_noisy.png",
+    "module": "noise",
+    "expected_label": "very_noisy",
+    "expected_score_max": 4.0
+  },
+  {
+    "file": "light_under.png",
+    "module": "lighting",
+    "expected_exposure_label": "underexposed",
+    "expected_exposure_score_max": 5.0
+  },
+  {
+    "file": "light_good.png",
+    "module": "lighting",
+    "expected_exposure_label": "well-exposed",
+    "expected_exposure_score_min": 8.0
+  },
+  {
+    "file": "light_over.png",
+    "module": "lighting",
+    "expected_exposure_label": "overexposed",
+    "expected_exposure_score_max": 5.0
+  },
+  {
+    "file": "light_warm.png",
+    "module": "lighting",
+    "expected_color_temp": "warm"
+  },
+  {
+    "file": "light_cool.png",
+    "module": "lighting",
+    "expected_color_temp": "cool"
+  },
+  {
+    "file": "light_shadow.png",
+    "module": "lighting",
+    "expected_harsh_shadows": true
+  },
+  {
+    "file": "light_flat.png",
+    "module": "lighting",
+    "expected_contrast_label": "flat"
+  },
+  {
+    "file": "horizon_level.png",
+    "module": "horizon",
+    "expected_is_level": true,
+    "expected_score_min": 9.0
+  },
+  {
+    "file": "horizon_slight.png",
+    "module": "horizon",
+    "expected_is_level": false,
+    "expected_score_max": 8.0
+  },
+  {
+    "file": "horizon_heavy.png",
+    "module": "horizon",
+    "expected_is_level": false,
+    "expected_score_max": 6.0
+  },
+  {
+    "file": "bokeh_excellent.png",
+    "module": "bokeh",
+    "expected_label": "excellent",
+    "expected_score_min": 9.0
+  },
+  {
+    "file": "bokeh_flat.png",
+    "module": "bokeh",
+    "expected_label": "flat",
+    "expected_score_max": 7.0
+  },
+  {
+    "file": "color_mono.png",
+    "module": "color_harmony",
+    "expected_label": "monochromatic"
+  },
+  {
+    "file": "color_complementary.png",
+    "module": "color_harmony",
+    "expected_label": "complementary"
+  },
+  {
+    "file": "color_warm_cast.png",
+    "module": "color_harmony",
+    "expected_color_cast": "red/warm"
+  },
+  {
+    "file": "comp_symmetric.png",
+    "module": "composition",
+    "expected_is_symmetric": true,
+    "expected_symmetry_score_min": 7.0
+  },
+  {
+    "file": "comp_asymmetric.png",
+    "module": "composition",
+    "expected_is_symmetric": false
+  },
+  {
+    "file": "comp_leading_lines.png",
+    "module": "composition",
+    "expected_has_leading_lines": true
+  },
+  {
+    "file": "fgbg_strong.png",
+    "module": "fg_bg",
+    "expected_label": "strong",
+    "expected_score_min": 9.0
+  },
+  {
+    "file": "fgbg_camouflaged.png",
+    "module": "fg_bg",
+    "expected_label": "camouflaged",
+    "expected_score_max": 4.0
+  },
+  {
+    "file": "fgbg_distracting.png",
+    "module": "fg_bg",
+    "expected_bg_distracting": true
+  },
+  {
+    "file": "ar_landscape_16x9.png",
+    "module": "aspect_ratio",
+    "expected_ratio_label": "16:9"
+  },
+  {
+    "file": "ar_portrait_9x16.png",
+    "module": "aspect_ratio",
+    "expected_ratio_label": "9:16"
+  },
+  {
+    "file": "ar_square.png",
+    "module": "aspect_ratio",
+    "expected_ratio_label": "1:1"
+  },
+  {
+    "file": "ar_standard_4x3.png",
+    "module": "aspect_ratio",
+    "expected_ratio_label": "4:3"
+  },
+  {
+    "file": "face_none.png",
+    "module": "face_expression",
+    "expected_faces": 0,
+    "expected_eye_label": "no_face"
+  },
+  {
+    "file": "face_none.png",
+    "module": "subject",
+    "expected_subject_detected": false
+  }
+]
