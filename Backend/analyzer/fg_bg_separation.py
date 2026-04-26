@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 fg_bg_separation.py
 -------------------

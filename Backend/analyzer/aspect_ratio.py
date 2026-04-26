@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 aspect_ratio.py
 ---------------

@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Local Ollama coaching layer.
 

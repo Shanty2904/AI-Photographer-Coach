@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 subject.py — YOLOv8n subject detection
 Detects 80 COCO classes. Falls back to Haar if ultralytics not installed.

@@ -1,439 +1,467 @@
-/* =================================================================
-   AI PHOTOGRAPHER COACH — Frontend application logic
-   Works with the new self-explanatory UI (index.html v2).
-================================================================= */
+// ── Constants ─────────────────────────────────────────────────────────────────
+const TARGET_CAPTURE_FPS = 24;
+const FRAME_INTERVAL_MS  = 1000 / TARGET_CAPTURE_FPS;
+const FRAME_WIDTH        = 640;
+const FRAME_HEIGHT       = 480;
+const JPEG_QUALITY       = 0.48;
+const MAX_IN_FLIGHT      = 1;
+const COOLDOWN_MS        = 7000; // ms to show each suggestion before evaluating
 
-const TARGET_CAPTURE_FPS  = 24;
-const FRAME_INTERVAL_MS   = 1000 / TARGET_CAPTURE_FPS;
-const FRAME_WIDTH         = 640;
-const FRAME_HEIGHT        = 480;
-const JPEG_QUALITY        = 0.48;
-const MAX_IN_FLIGHT       = 1;
+// ── DOM refs ──────────────────────────────────────────────────────────────────
+const video         = document.querySelector("#camera");
+const canvas        = document.querySelector("#frameCanvas");
+const context       = canvas.getContext("2d", { willReadFrequently: true });
+const captureCanvas = document.querySelector("#captureCanvas");
+const captureCtx    = captureCanvas.getContext("2d");
 
-/* ── DOM refs ─────────────────────────────────────────────────── */
-const video             = document.querySelector("#camera");
-const canvas            = document.querySelector("#frameCanvas");
-const ctx               = canvas.getContext("2d", { willReadFrequently: true });
-const backendUrlInput   = document.querySelector("#backendUrl");
-const connectButton     = document.querySelector("#connectButton");
-const cameraButton      = document.querySelector("#cameraButton");
-const switchCameraButton= document.querySelector("#switchCameraButton");
-const reconnectButton   = document.querySelector("#reconnectButton");
-const floatControls     = document.querySelector("#floatControls");
-const setupPanel        = document.querySelector("#setupPanel");
-const viewfinderGrid    = document.querySelector("#viewfinderGrid");
+const backendUrlInput = document.querySelector("#backendUrl");
+const connectButton   = document.querySelector("#connectButton");
+const cameraButton    = document.querySelector("#cameraButton");
+const captureButton   = document.querySelector("#captureButton");
 
-// Status / connection badge
-const serverStatus      = document.querySelector("#serverStatus");
-const statusDot         = document.querySelector("#statusDot");   // unused separately, badge class handles colour
-const statusText        = document.querySelector("#statusText");
+const serverStatus  = document.querySelector("#serverStatus");
+const readyState    = document.querySelector("#readyState");
+const coachMessage  = document.querySelector("#coachMessage");
+const scoreMeter    = document.querySelector("#scoreMeter");
+const scoreValue    = document.querySelector("#scoreValue");
+const gradeValue    = document.querySelector("#gradeValue");
+const weakestValue  = document.querySelector("#weakestValue");
+const historyList   = document.querySelector("#historyList");
 
-// Readiness
-const readinessBadge    = document.querySelector("#readinessBadge");
-const readinessIcon     = document.querySelector("#readinessIcon");
-const readinessLabel    = document.querySelector("#readinessLabel");
+// Suggestion controls
+const suggestionControls = document.querySelector("#suggestionControls");
+const cooldownBar        = document.querySelector("#cooldownBar");
+const cooldownTimer      = document.querySelector("#cooldownTimer");
+const skipBtn            = document.querySelector("#skipBtn");
 
-// Score arc
-const arcFill           = document.querySelector("#arcFill");
-const arcGrade          = document.querySelector("#gradeValue");
-const scoreValueEl      = document.querySelector("#scoreValue");
+// Rotation HUD
+const rotationHud  = document.querySelector("#rotationHud");
+const tiltDegree   = document.querySelector("#tiltDegree");
+const tiltHint     = document.querySelector("#tiltHint");
+const dialNeedle   = document.querySelector("#dialNeedle");
+const dialArcPath  = document.querySelector("#dialArcPath");
 
-// Coach panel
-const coachMessage      = document.querySelector("#coachMessage");
-const scoreMeter        = document.querySelector("#scoreMeter");
-const scoreBarVal       = document.querySelector("#scoreBarVal");
-const weakestValue      = document.querySelector("#weakestValue");
+// Report modal
+const reportModal       = document.querySelector("#reportModal");
+const reportImage       = document.querySelector("#reportImage");
+const reportScore       = document.querySelector("#reportScore");
+const reportGrade       = document.querySelector("#reportGrade");
+const reportTilt        = document.querySelector("#reportTilt");
+const reportHistoryList = document.querySelector("#reportHistoryList");
+const closeReportBtn    = document.querySelector("#closeReportBtn");
+const downloadBtn       = document.querySelector("#downloadBtn");
 
-// Metrics
-const captureFpsEl      = document.querySelector("#captureFps");
-const analysisFpsEl     = document.querySelector("#analysisFps");
-const latencyEl         = document.querySelector("#latencyValue");
+// Onboarding
+const onboardingOverlay = document.querySelector("#onboardingOverlay");
+const startAppBtn       = document.querySelector("#startAppBtn");
 
-// Setup steps
-const step1El           = document.querySelector("#step1");
-const step2El           = document.querySelector("#step2");
+// ── App state ─────────────────────────────────────────────────────────────────
+let stream          = null;
+let socket          = null;
+let captureTimer    = null;
+let inFlightFrames  = 0;
+let useHttpFallback = false;
+let isPaused        = false;
+let lastTiltAngle   = 0;
 
-/* ── SVG arc constants ─────────────────────────────────────────
-   Circle: r=32 → circumference = 2πr ≈ 201.06
-─────────────────────────────────────────────────────────────── */
-const ARC_CIRCUMFERENCE = 2 * Math.PI * 32;
+// Suggestion state machine
+let activeSuggestion  = null;  // { message, category, scoreAtStart, weakestAtStart }
+let suggestionLocked  = false; // blocks new suggestions during cooldown
+let suggestionTimer   = null;
+let countdownInterval = null;  // drives the visible countdown
+let lastScore         = 0;
+let lastWeakest       = "";
+const appliedTips     = new Set(); // confirmed improvements only
 
+// ── Onboarding ────────────────────────────────────────────────────────────────
+startAppBtn.addEventListener("click", () => {
+  onboardingOverlay.classList.add("hidden");
+});
 
-/* ── Auto-detect backend URL ───────────────────────────────────── */
-(function setDefaultBackendUrl() {
-  const loc = window.location;
-  backendUrlInput.value = loc.protocol === "file:"
-    ? "http://localhost:8000"
-    : `${loc.protocol}//${loc.host}`;
-})();
-
-
-/* ── State ─────────────────────────────────────────────────────── */
-let stream                = null;
-let socket                = null;
-let captureTimer          = null;
-let inFlightFrames        = 0;
-let capturedFrames        = 0;
-let analyzedFrames        = 0;
-let useHttpFallback       = false;
-let captureWindowStartAt  = performance.now();
-let analysisWindowStartAt = performance.now();
-let measuredCaptureFps    = 0;
-let backCameras           = [];
-let currentCameraIndex    = 0;
-
-
-/* ════════════════════════════════════════════════════════════════
-   STATUS / CONNECTION BADGE
-════════════════════════════════════════════════════════════════ */
+// ── Status helpers ────────────────────────────────────────────────────────────
 function setStatus(message, state = "") {
-  statusText.textContent = message;
-  serverStatus.className = `connection-badge ${state}`.trim();
+  serverStatus.textContent = message;
+  serverStatus.className   = "connection-status" + (state === "ready" ? " connected" : "");
+  serverStatus.style.color = "";
+  if (state === "error")   serverStatus.style.color = "var(--danger)";
+  if (state === "warning") serverStatus.style.color = "var(--warn)";
 }
 
-
-/* ════════════════════════════════════════════════════════════════
-   BACKEND CHECK
-════════════════════════════════════════════════════════════════ */
 function getBackendUrl() {
   return backendUrlInput.value.trim().replace(/\/$/, "");
 }
-
 function getWebSocketUrl() {
-  const url      = new URL(getBackendUrl());
-  url.protocol   = url.protocol === "https:" ? "wss:" : "ws:";
-  url.pathname   = "/ws/live";
-  url.search     = "";
+  const url    = new URL(getBackendUrl());
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  url.pathname = "/ws/live";
+  url.search   = "";
   return url.toString();
 }
 
+// ── Backend health check ──────────────────────────────────────────────────────
 async function checkBackend() {
-  setStatus("Connecting to AI engine…");
   try {
     const res     = await fetch(`${getBackendUrl()}/health`, { cache: "no-store" });
     const payload = await res.json();
-    if (!res.ok || payload.status !== "ok") throw new Error("Backend did not return ok");
-    setStatus(`AI engine ready · ${payload.live_capture_target_fps || 24} fps target`, "ready");
-    step1El.classList.add("done");
+    if (!res.ok || payload.status !== "ok") throw new Error();
+    setStatus("Connected", "ready");
     return true;
   } catch {
-    setStatus("AI engine offline — check the address", "error");
+    setStatus("Backend offline", "error");
     return false;
   }
 }
 
-
-/* ════════════════════════════════════════════════════════════════
-   CAMERA MANAGEMENT
-════════════════════════════════════════════════════════════════ */
-function _cameraScore(label) {
-  const l = label.toLowerCase();
-  if (l.includes("ultra") || l.includes("ultrawide")) return 40;
-  if (l.includes("wide"))                              return 30;
-  if (l.includes("telephoto") || l.includes("zoom"))  return 20;
-  if (l.includes("front"))                             return 99;
-  return 10;
-}
-
-async function _enumerateBackCameras() {
-  const devices  = await navigator.mediaDevices.enumerateDevices();
-  const videos   = devices.filter(d => d.kind === "videoinput");
-  const hasLabels= videos.some(d => d.label);
-  const back     = hasLabels
-    ? videos.filter(d => !d.label.toLowerCase().includes("front"))
-    : videos;
-  back.sort((a, b) => _cameraScore(a.label) - _cameraScore(b.label));
-  backCameras = back;
-}
-
-async function _openCamera(index) {
-  if (stream) {
-    stream.getTracks().forEach(t => t.stop());
-    stream = null;
-  }
-  const device           = backCameras[index];
-  const videoConstraints = device
-    ? { deviceId: { exact: device.deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { min: TARGET_CAPTURE_FPS, ideal: 30 } }
-    : { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720  }, frameRate: { min: TARGET_CAPTURE_FPS, ideal: 30 } };
-
-  stream          = await navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: false });
-  video.srcObject = stream;
-  await video.play();
-
-  cameraButton.textContent = "Camera on";
-  if (backCameras.length > 1) {
-    switchCameraButton.title       = `Lens ${index + 1} of ${backCameras.length}`;
-  }
-}
-
+// ── Camera ────────────────────────────────────────────────────────────────────
 async function startCamera() {
   if (stream) return;
   try {
-    stream          = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: "environment" },
+        width:  { ideal: 1280 },
+        height: { ideal: 720 },
+        frameRate: { min: TARGET_CAPTURE_FPS, ideal: 30 },
+      },
+      audio: false,
+    });
     video.srcObject = stream;
     await video.play();
-
-    await _enumerateBackCameras();
-    if (backCameras.length > 0) {
-      currentCameraIndex = 0;
-      await _openCamera(0);
-    } else {
-      cameraButton.textContent = "Camera on";
-    }
-
-    // Transition UI from setup → live mode
-    setupPanel.classList.add("hidden");
-    floatControls.style.display = "flex";
-    if (backCameras.length < 2) switchCameraButton.style.display = "none";
-    step2El.classList.add("done");
-
-    // Show viewfinder grid
-    setTimeout(() => viewfinderGrid.classList.add("visible"), 400);
-
-    // Show readiness badge (waiting state)
-    readinessBadge.classList.add("visible");
-
+    cameraButton.textContent = "📷 Camera On";
+    cameraButton.disabled    = true;
+    captureButton.disabled   = false;
+    coachMessage.textContent = "Analyzing frame…";
     startCaptureLoop();
-  } catch {
-    setReadiness("Camera blocked", "🚫", false);
-    coachMessage.textContent = "Please allow camera access and reload this page.";
+  } catch (err) {
+    readyState.textContent   = "Camera blocked";
+    coachMessage.textContent = "Camera access denied. Please allow permissions.";
+    console.error("Camera error:", err);
   }
 }
 
-async function switchCamera() {
-  if (backCameras.length < 2) return;
-  currentCameraIndex = (currentCameraIndex + 1) % backCameras.length;
-  try   { await _openCamera(currentCameraIndex); }
-  catch { currentCameraIndex = (currentCameraIndex + 1) % backCameras.length; await _openCamera(currentCameraIndex); }
-}
-
-
-/* ════════════════════════════════════════════════════════════════
-   WEBSOCKET / SOCKET CONNECTION
-════════════════════════════════════════════════════════════════ */
+// ── WebSocket ─────────────────────────────────────────────────────────────────
 function connectSocket() {
   if (socket && [WebSocket.OPEN, WebSocket.CONNECTING].includes(socket.readyState)) {
     socket.close();
   }
   useHttpFallback = false;
   socket          = new WebSocket(getWebSocketUrl());
-  setStatus("Connecting to AI engine…");
+  setStatus("Connecting…", "warning");
 
-  socket.addEventListener("open", () => {
-    setStatus("AI engine connected — live coaching active", "ready");
-    connectButton.textContent = "Reconnect";
-  });
-
+  socket.addEventListener("open",    () => setStatus("Connected via WebSocket", "ready"));
   socket.addEventListener("message", (event) => {
     inFlightFrames = Math.max(0, inFlightFrames - 1);
-    analyzedFrames += 1;
-    updateAnalysisFps();
-    const payload = JSON.parse(event.data);
+    const payload  = JSON.parse(event.data);
     if (payload.error) {
-      setReadiness("AI error", "⚠️", false);
+      readyState.textContent   = "Error";
+      readyState.classList.remove("ready");
       coachMessage.textContent = payload.error;
       return;
     }
-    renderCoach(payload);
+    if (!isPaused) renderCoach(payload);
   });
-
-  socket.addEventListener("close", () => {
-    inFlightFrames  = 0;
-    useHttpFallback = true;
-    setStatus("AI engine connected via HTTP fallback", "ready");
-  });
-
-  socket.addEventListener("error", () => {
-    useHttpFallback = true;
-    setStatus("AI engine connected via HTTP fallback", "ready");
-  });
+  socket.addEventListener("close", () => { inFlightFrames = 0; useHttpFallback = true; setStatus("Connected via HTTP", "ready"); });
+  socket.addEventListener("error", () => { useHttpFallback = true; setStatus("Connected via HTTP", "ready"); });
 }
 
-
-/* ════════════════════════════════════════════════════════════════
-   FRAME CAPTURE LOOP
-════════════════════════════════════════════════════════════════ */
+// ── Capture loop ──────────────────────────────────────────────────────────────
 function startCaptureLoop() {
   if (captureTimer) clearInterval(captureTimer);
+  isPaused     = false;
   captureTimer = setInterval(captureAndSendFrame, FRAME_INTERVAL_MS);
 }
 
 function captureAndSendFrame() {
-  if (!video.videoWidth) return;
-
-  capturedFrames += 1;
-  updateCaptureFps();
-
+  if (!video.videoWidth || isPaused) return;
   if (inFlightFrames >= MAX_IN_FLIGHT) return;
 
-  const vr = video.videoWidth / video.videoHeight;
-  const tr = FRAME_WIDTH / FRAME_HEIGHT;
-  let sx = 0, sy = 0, sw = video.videoWidth, sh = video.videoHeight;
-  if (vr > tr) { sw = video.videoHeight * tr; sx = (video.videoWidth - sw) / 2; }
-  else         { sh = video.videoWidth  / tr; sy = (video.videoHeight - sh) / 2; }
-
-  ctx.drawImage(video, sx, sy, sw, sh, 0, 0, FRAME_WIDTH, FRAME_HEIGHT);
-  const image = canvas.toDataURL("image/jpeg", JPEG_QUALITY);
-
-  const payload = {
-    image,
-    width: FRAME_WIDTH,
-    height: FRAME_HEIGHT,
-    include_details: false,
-    include_tip: false,
-    client_capture_fps: measuredCaptureFps,
-  };
+  const { sx, sy, sw, sh } = cropToTarget(video.videoWidth, video.videoHeight, FRAME_WIDTH, FRAME_HEIGHT);
+  context.drawImage(video, sx, sy, sw, sh, 0, 0, FRAME_WIDTH, FRAME_HEIGHT);
+  const image   = canvas.toDataURL("image/jpeg", JPEG_QUALITY);
+  const payload = { image, width: FRAME_WIDTH, height: FRAME_HEIGHT, include_details: false, include_tip: false, client_capture_fps: 24 };
 
   if (!useHttpFallback && socket && socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify(payload));
-    inFlightFrames += 1;
+    inFlightFrames++;
     return;
   }
   sendFrameOverHttp(payload);
 }
 
+function cropToTarget(vW, vH, tW, tH) {
+  const videoRatio  = vW / vH;
+  const targetRatio = tW / tH;
+  let sx = 0, sy = 0, sw = vW, sh = vH;
+  if (videoRatio > targetRatio) { sw = vH * targetRatio; sx = (vW - sw) / 2; }
+  else                          { sh = vW / targetRatio; sy = (vH - sh) / 2; }
+  return { sx, sy, sw, sh };
+}
+
 async function sendFrameOverHttp(payload) {
-  inFlightFrames += 1;
+  inFlightFrames++;
   try {
     const res    = await fetch(`${getBackendUrl()}/analyze/live`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
     });
     const result = await res.json();
-    if (!res.ok || result.error) throw new Error(result.error || `Backend returned ${res.status}`);
-    analyzedFrames += 1;
-    updateAnalysisFps();
-    renderCoach(result);
-    setStatus("AI engine connected via HTTP", "ready");
-  } catch (err) {
-    setStatus("AI engine unavailable", "error");
-    setReadiness("Reconnect AI", "⚠️", false);
-    coachMessage.textContent = err.message || "Live coaching temporarily unavailable.";
+    if (!res.ok || result.error) throw new Error(result.error || `${res.status}`);
+    if (!isPaused) renderCoach(result);
+    setStatus("Connected via HTTP", "ready");
+  } catch {
+    setStatus("Backend offline", "error");
+    readyState.textContent   = "Disconnected";
+    readyState.classList.remove("ready");
+    coachMessage.textContent = "AI Analysis paused. Connect to the backend.";
   } finally {
     inFlightFrames = Math.max(0, inFlightFrames - 1);
   }
 }
 
+// ── Rotation HUD ──────────────────────────────────────────────────────────────
+function updateRotationHud(tiltAngle) {
+  if (tiltAngle === undefined || tiltAngle === null) return;
+  lastTiltAngle = tiltAngle;
 
-/* ════════════════════════════════════════════════════════════════
-   FPS TRACKING
-════════════════════════════════════════════════════════════════ */
-function updateCaptureFps() {
-  const now     = performance.now();
-  const elapsed = now - captureWindowStartAt;
-  if (elapsed >= 1000) {
-    measuredCaptureFps          = capturedFrames / (elapsed / 1000);
-    captureFpsEl.textContent    = measuredCaptureFps.toFixed(1);
-    capturedFrames              = 0;
-    captureWindowStartAt        = now;
-  }
-}
+  const abs = Math.abs(tiltAngle);
+  tiltDegree.textContent = abs.toFixed(1) + "°";
 
-function updateAnalysisFps() {
-  const now     = performance.now();
-  const elapsed = now - analysisWindowStartAt;
-  if (elapsed >= 1000) {
-    analysisFpsEl.textContent   = (analyzedFrames / (elapsed / 1000)).toFixed(1);
-    analyzedFrames              = 0;
-    analysisWindowStartAt       = now;
-  }
-}
+  const clampedAngle = Math.max(-45, Math.min(45, tiltAngle));
+  dialNeedle.setAttribute("transform", `rotate(${clampedAngle}, 30, 28)`);
 
+  const maxDash = 75;
+  const fill    = Math.min(maxDash, (abs / 45) * maxDash);
+  dialArcPath.style.strokeDashoffset = maxDash - fill;
 
-/* ════════════════════════════════════════════════════════════════
-   RENDER COACH — update every UI element from server payload
-════════════════════════════════════════════════════════════════ */
-function setReadiness(label, icon, isReady) {
-  readinessIcon.textContent  = icon;
-  readinessLabel.textContent = label;
-  readinessBadge.classList.toggle("ready", isReady);
-}
-
-function setArc(scorePercent, ready, score) {
-  // Circumference = 201.06; offset 0 = full circle, offset 201 = empty
-  const offset = ARC_CIRCUMFERENCE - (ARC_CIRCUMFERENCE * scorePercent / 100);
-  arcFill.style.strokeDashoffset = offset.toFixed(1);
-
-  // Colour
-  arcFill.classList.remove("ready", "warn", "danger");
-  arcGrade.classList.remove("ready-color", "warn-color", "danger-color");
-  if (ready) {
-    arcFill.classList.add("ready");
-    arcGrade.classList.add("ready-color");
-  } else if (score >= 6) {
-    arcFill.classList.add("warn");
-    arcGrade.classList.add("warn-color");
+  const isLevel = abs <= 2.0;
+  if (isLevel) {
+    rotationHud.classList.add("level");
+    tiltDegree.style.color   = "";
+    dialNeedle.style.stroke  = "var(--success)";
+    dialArcPath.style.stroke = "var(--success)";
+    tiltHint.textContent     = "Leveled ✓";
   } else {
-    arcFill.classList.add("danger");
-    arcGrade.classList.add("danger-color");
+    rotationHud.classList.remove("level");
+    const dir = tiltAngle > 0 ? "↺ CCW" : "↻ CW";
+    dialNeedle.style.stroke  = abs > 5 ? "var(--danger)" : "var(--warn)";
+    dialArcPath.style.stroke = abs > 5 ? "var(--danger)" : "var(--warn)";
+    tiltHint.textContent     = `Rotate ${abs.toFixed(1)}° ${dir}`;
   }
 }
 
-function renderCoach(payload) {
-  const live    = payload.live    || {};
-  const capture = payload.capture || {};
-  const score   = Number(live.score || 0);
-  const pct     = Math.max(0, Math.min(100, score * 10));
-  const ready   = Boolean(live.ready_to_capture);
-  const grade   = live.grade || "--";
-  const weakest = (live.weakest_category || "").replaceAll("_", " ") || "–";
-  const message = live.message || "Hold steady while the next frame is analysed.";
+// ── Suggestion system ─────────────────────────────────────────────────────────
 
-  /* Readiness badge */
-  if (ready) {
-    setReadiness("Ready to capture!", "✅", true);
-  } else {
-    setReadiness("Adjust before capturing", "🎯", false);
-  }
+/** Returns true if a message is a real actionable suggestion (not a "hold steady" type). */
+function isActionableSuggestion(msg, ready) {
+  if (!msg || ready) return false;
+  const lower = msg.toLowerCase();
+  return !lower.includes("steady") && !lower.includes("looks good") && !lower.includes("analyzing");
+}
 
-  /* Coach message */
+/** Start showing a new suggestion and begin the cooldown timer. */
+function startSuggestion(message, category, score, weakest) {
+  if (suggestionLocked) return;
+  if (!isActionableSuggestion(message, false)) return;
+
+  activeSuggestion = { message, category, scoreAtStart: score, weakestAtStart: weakest };
+  suggestionLocked = true;
+
   coachMessage.textContent = message;
+  suggestionControls.style.display = "flex";
 
-  /* Score bar */
-  scoreMeter.style.width        = `${pct}%`;
-  scoreMeter.style.background   = ready ? "var(--ready)" : score >= 6 ? "var(--warn)" : "var(--danger)";
-  scoreBarVal.textContent       = `${score.toFixed(1)} / 10`;
+  // Animate cooldown bar: reset then shrink
+  cooldownBar.style.transition = "none";
+  cooldownBar.style.width      = "100%";
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    cooldownBar.style.transition = `width ${COOLDOWN_MS}ms linear`;
+    cooldownBar.style.width      = "0%";
+  }));
 
-  /* Focus tag */
-  weakestValue.textContent = weakest || "–";
+  // Visible countdown ticker
+  let remaining = Math.round(COOLDOWN_MS / 1000);
+  cooldownTimer.textContent = remaining + "s";
+  clearInterval(countdownInterval);
+  countdownInterval = setInterval(() => {
+    remaining--;
+    cooldownTimer.textContent = remaining > 0 ? remaining + "s" : "…";
+    if (remaining <= 0) clearInterval(countdownInterval);
+  }, 1000);
 
-  /* Score arc + grade */
-  scoreValueEl.textContent = score.toFixed(1);
-  arcGrade.textContent     = grade;
-  setArc(pct, ready, score);
-
-  /* Metrics */
-  if (capture.client_capture_fps != null) {
-    captureFpsEl.textContent = Number(capture.client_capture_fps).toFixed(1);
-  }
-  if (capture.server_analysis_fps != null) {
-    analysisFpsEl.textContent = Number(capture.server_analysis_fps).toFixed(1);
-  }
-  latencyEl.textContent = capture.processing_ms ? `${capture.processing_ms} ms` : "--";
+  clearTimeout(suggestionTimer);
+  suggestionTimer = setTimeout(evaluateSuggestion, COOLDOWN_MS);
 }
 
+/** Called when the cooldown expires — checks if the user adjusted, then unlocks. */
+function evaluateSuggestion() {
+  if (!activeSuggestion) { clearSuggestionState(); return; }
 
-/* ════════════════════════════════════════════════════════════════
-   EVENT LISTENERS
-════════════════════════════════════════════════════════════════ */
+  const scoreImproved    = lastScore > activeSuggestion.scoreAtStart + 0.4;
+  const categoryChanged  = lastWeakest !== "" && lastWeakest !== activeSuggestion.weakestAtStart;
+
+  if ((scoreImproved || categoryChanged) && !appliedTips.has(activeSuggestion.message)) {
+    appliedTips.add(activeSuggestion.message);
+    addImprovementToUI(activeSuggestion.message);
+  }
+
+  clearSuggestionState();
+}
+
+/** Called when user clicks Skip — dismisses without storing. */
+function skipSuggestion() {
+  clearTimeout(suggestionTimer);
+  clearSuggestionState();
+}
+
+/** Resets all suggestion state and hides controls. */
+function clearSuggestionState() {
+  activeSuggestion = null;
+  suggestionLocked = false;
+  suggestionControls.style.display = "none";
+  cooldownBar.style.transition = "none";
+  cooldownBar.style.width = "0%";
+  clearInterval(countdownInterval);
+  cooldownTimer.textContent = "";
+}
+
+/** Adds a confirmed improvement to the sidebar list. */
+function addImprovementToUI(message) {
+  const isEmpty = historyList.querySelector(".empty-state");
+  if (isEmpty) historyList.innerHTML = "";
+  const li = document.createElement("li");
+  li.textContent = message;
+  li.style.animation = "slideIn .35s cubic-bezier(.16,1,.3,1)";
+  historyList.prepend(li);
+}
+
+skipBtn.addEventListener("click", skipSuggestion);
+
+// ── Render coach data ─────────────────────────────────────────────────────────
+function renderCoach(payload) {
+  const live         = payload.live || {};
+  const score        = Number(live.score || 0);
+  const scorePercent = Math.max(0, Math.min(100, score * 10));
+  const ready        = Boolean(live.ready_to_capture);
+
+  // Track latest values for suggestion evaluation
+  lastScore   = score;
+  lastWeakest = live.weakest_category || "";
+
+  // Update status pill
+  readyState.textContent = ready ? "✓ Perfect Framing!" : "Analyzing…";
+  readyState.className   = `status-indicator${ready ? " ready" : ""}`;
+
+  // --- Suggestion logic ---
+  if (suggestionLocked) {
+    // If user reached perfect framing while a suggestion is active, count it as applied immediately
+    if (ready && activeSuggestion && !appliedTips.has(activeSuggestion.message)) {
+      appliedTips.add(activeSuggestion.message);
+      addImprovementToUI(activeSuggestion.message);
+      clearTimeout(suggestionTimer);
+      clearSuggestionState();
+    }
+    // Keep showing the active suggestion — don't overwrite coachMessage
+  } else {
+    // Not locked: update coach message and potentially trigger a new suggestion
+    const msg = live.message || "Looking good. Keep it steady.";
+    coachMessage.textContent = msg;
+    if (isActionableSuggestion(msg, ready)) {
+      startSuggestion(msg, live.weakest_category || "", score, live.weakest_category || "");
+    }
+  }
+
+  // Update score display
+  scoreValue.textContent = live.score ?? "--";
+  gradeValue.textContent = live.grade  || "--";
+  weakestValue.textContent = (live.weakest_category || "None").replaceAll("_", " ");
+
+  scoreMeter.style.width      = `${scorePercent}%`;
+  scoreMeter.style.background = ready ? "var(--success)" : score >= 6 ? "var(--warn)" : "var(--danger)";
+  scoreMeter.style.boxShadow  = ready
+    ? "0 0 14px var(--success-glow)"
+    : score >= 6
+    ? "0 0 14px var(--warn-glow)"
+    : "0 0 14px var(--danger-glow)";
+
+  // Update rotation HUD
+  const analysis = payload.analysis || {};
+  const horizon  = analysis.horizon  || {};
+  if (horizon.tilt_angle !== undefined) {
+    updateRotationHud(horizon.tilt_angle);
+  } else {
+    const match = live.message && live.message.match(/([\d.]+)°/);
+    if (match) {
+      const deg = parseFloat(match[1]);
+      const dir = live.message.toLowerCase().includes("counter") ? 1 : -1;
+      updateRotationHud(deg * dir);
+    }
+  }
+}
+
+// ── Capture & Report ──────────────────────────────────────────────────────────
+captureButton.addEventListener("click", () => {
+  if (!video.videoWidth) return;
+  isPaused = true;
+  clearInterval(captureTimer);
+
+  const tW = 1280, tH = 720;
+  const { sx, sy, sw, sh } = cropToTarget(video.videoWidth, video.videoHeight, tW, tH);
+  captureCtx.drawImage(video, sx, sy, sw, sh, 0, 0, tW, tH);
+  const dataUrl = captureCanvas.toDataURL("image/jpeg", 0.95);
+
+  reportImage.src         = dataUrl;
+  reportScore.textContent = scoreValue.textContent;
+  reportGrade.textContent = gradeValue.textContent;
+  reportTilt.textContent  = Math.abs(lastTiltAngle).toFixed(1) + "°";
+
+  reportHistoryList.innerHTML = "";
+  if (appliedTips.size === 0) {
+    const li = document.createElement("li");
+    li.textContent = "No specific adjustments were needed. Perfect shot!";
+    reportHistoryList.appendChild(li);
+  } else {
+    appliedTips.forEach(tip => {
+      const li = document.createElement("li");
+      li.textContent = tip;
+      reportHistoryList.appendChild(li);
+    });
+  }
+
+  reportModal.classList.add("active");
+});
+
+closeReportBtn.addEventListener("click", () => {
+  reportModal.classList.remove("active");
+  startCaptureLoop();
+});
+
+// ── Download as JPG ───────────────────────────────────────────────────────────
+downloadBtn.addEventListener("click", () => {
+  const jpegDataUrl = reportImage.src.startsWith("data:image/jpeg")
+    ? reportImage.src
+    : (() => {
+        const img       = new Image();
+        img.src         = reportImage.src;
+        const tmpCanvas = document.createElement("canvas");
+        tmpCanvas.width  = img.naturalWidth  || 1280;
+        tmpCanvas.height = img.naturalHeight || 720;
+        tmpCanvas.getContext("2d").drawImage(img, 0, 0);
+        return tmpCanvas.toDataURL("image/jpeg", 0.95);
+      })();
+
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+  const a         = document.createElement("a");
+  a.href          = jpegDataUrl;
+  a.download      = `AI_Photo_Coach_${timestamp}.jpg`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+});
+
+// ── Wire buttons ──────────────────────────────────────────────────────────────
 connectButton.addEventListener("click", async () => {
-  const ok = await checkBackend();
-  if (ok) connectSocket();
+  await checkBackend();
+  connectSocket();
 });
-
-reconnectButton.addEventListener("click", async () => {
-  const ok = await checkBackend();
-  if (ok) connectSocket();
-});
-
 cameraButton.addEventListener("click", startCamera);
-switchCameraButton.addEventListener("click", switchCamera);
 
-
-/* ════════════════════════════════════════════════════════════════
-   BOOT — auto-connect on page load
-════════════════════════════════════════════════════════════════ */
-checkBackend().then((ok) => {
-  if (ok) connectSocket();
-});
+// ── Boot ──────────────────────────────────────────────────────────────────────
+checkBackend().then(ok => { if (ok) connectSocket(); });

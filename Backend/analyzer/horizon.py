@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 horizon.py
 ----------
@@ -75,12 +76,12 @@ def analyze_horizon(frame: np.ndarray) -> dict:
         is_level = False
         score = 7.0
         direction = "counter-clockwise" if angle > 0 else "clockwise"
-        suggestion = f"Slight tilt of {abs_angle:.1f}°. Rotate camera {direction} a little."
+        suggestion = f"Rotate {abs_angle:.1f}° {direction} to level the shot."
     else:
         is_level = False
         score = max(0.0, 10.0 - abs_angle * 0.8)
         direction = "counter-clockwise" if angle > 0 else "clockwise"
-        suggestion = f"Significant tilt of {abs_angle:.1f}°. Rotate camera {direction} to level the horizon."
+        suggestion = f"Rotate {abs_angle:.1f}° {direction} to level the horizon."
 
     return {
         "tilt_angle": round(angle, 2),

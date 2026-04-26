@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 composition.py — Rule of thirds, golden ratio, symmetry, leading lines
 Uses shared YOLOv8 detector for subject center.

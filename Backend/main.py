@@ -1,3 +1,4 @@
+from __future__ import annotations
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -42,7 +43,7 @@ class FrameRequest(BaseModel):
 class LiveFrameRequest(FrameRequest):
     include_details: bool = False
     include_tip: bool = False
-    client_capture_fps: float | None = None
+    client_capture_fps: float = None
 
 def decode_image(b64_string: str) -> np.ndarray:
     if "," in b64_string:
@@ -168,12 +169,21 @@ def live_coaching_message(result: dict) -> dict:
 def build_live_response(
     result: dict,
     started_at: float,
-    client_capture_fps: float | None = None,
-    server_analysis_fps: float | None = None,
+    client_capture_fps: float = None,
+    server_analysis_fps: float = None,
 ) -> dict:
     processing_ms = round((time.perf_counter() - started_at) * 1000, 1)
+    # Always expose horizon tilt so the frontend rotation HUD can animate
+    horizon = result.get("horizon", {})
     return {
         "live": live_coaching_message(result),
+        "analysis": {
+            "horizon": {
+                "tilt_angle": horizon.get("tilt_angle", 0.0),
+                "tilt_abs":   horizon.get("tilt_abs",   0.0),
+                "is_level":   horizon.get("is_level",   True),
+            }
+        },
         "tip": "",
         "error": "",
         "capture": {
@@ -289,10 +299,11 @@ async def live_camera_socket(websocket: WebSocket):
         traceback.print_exc()
         await websocket.send_json({"error": str(e)})
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
-
+# Mount frontend static files — must be last so it doesn't shadow API routes
 frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "Frontend"))
 if os.path.isdir(frontend_dir):
     app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="frontend")
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

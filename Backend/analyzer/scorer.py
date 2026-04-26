@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 scorer.py — updated with all 12 modules
 """

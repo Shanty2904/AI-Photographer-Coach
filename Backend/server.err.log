@@ -1,43 +1,92 @@
-INFO:     Started server process [5788]
-INFO:     Waiting for application startup.
-INFO:     Application startup complete.
-INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
-INFO:     127.0.0.1:55639 - "WebSocket /ws/live" [accepted]
-INFO:     connection open
-INFO:     10.225.106.44:33090 - "WebSocket /ws/live" [accepted]
-INFO:     connection open
-INFO:     10.225.106.44:58342 - "WebSocket /ws/live" [accepted]
-INFO:     connection open
-INFO:     connection closed
-INFO:     10.225.106.134:43528 - "WebSocket /ws/live" [accepted]
-INFO:     connection open
-INFO:     connection closed
-INFO:     10.225.106.134:38006 - "WebSocket /ws/live" [accepted]
-INFO:     connection open
-INFO:     10.225.106.44:47624 - "WebSocket /ws/live" [accepted]
-INFO:     connection open
-INFO:     connection closed
-INFO:     10.225.106.44:49638 - "WebSocket /ws/live" [accepted]
-INFO:     connection closed
-INFO:     connection closed
-INFO:     10.225.106.44:39026 - "WebSocket /ws/live" [accepted]
-INFO:     connection open
-INFO:     10.225.106.44:44362 - "WebSocket /ws/live" [accepted]
-INFO:     connection open
-INFO:     connection closed
-INFO:     connection closed
-INFO:     connection closed
-INFO:     10.225.106.44:58752 - "WebSocket /ws/live" [accepted]
-INFO:     connection open
-INFO:     connection closed
-INFO:     10.225.106.44:48260 - "WebSocket /ws/live" [accepted]
-INFO:     connection open
-INFO:     connection closed
-INFO:     connection closed
-INFO:     127.0.0.1:53519 - "WebSocket /ws/live" [accepted]
-INFO:     connection open
-INFO:     connection closed
-INFO:     Shutting down
-INFO:     Waiting for application shutdown.
-INFO:     Application shutdown complete.
-INFO:     Finished server process [5788]
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\AIPCoach\AI-Photographer-Coach-main\Backend\venv\Lib\site-packages\uvicorn\__main__.py", line 4, in <module>
+    uvicorn.main()
+    ~~~~~~~~~~~~^^
+  File "C:\AIPCoach\AI-Photographer-Coach-main\Backend\venv\Lib\site-packages\click\core.py", line 1514, in __call__
+    return self.main(*args, **kwargs)
+           ~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\AIPCoach\AI-Photographer-Coach-main\Backend\venv\Lib\site-packages\click\core.py", line 1435, in main
+    rv = self.invoke(ctx)
+  File "C:\AIPCoach\AI-Photographer-Coach-main\Backend\venv\Lib\site-packages\click\core.py", line 1298, in invoke
+    return ctx.invoke(self.callback, **ctx.params)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\AIPCoach\AI-Photographer-Coach-main\Backend\venv\Lib\site-packages\click\core.py", line 853, in invoke
+    return callback(*args, **kwargs)
+  File "C:\AIPCoach\AI-Photographer-Coach-main\Backend\venv\Lib\site-packages\uvicorn\main.py", line 409, in main
+    run(
+    ~~~^
+        app,
+        ^^^^
+    ...<45 lines>...
+        h11_max_incomplete_event_size=h11_max_incomplete_event_size,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\AIPCoach\AI-Photographer-Coach-main\Backend\venv\Lib\site-packages\uvicorn\main.py", line 575, in run
+    server.run()
+    ~~~~~~~~~~^^
+  File "C:\AIPCoach\AI-Photographer-Coach-main\Backend\venv\Lib\site-packages\uvicorn\server.py", line 65, in run
+    return asyncio.run(self.serve(sockets=sockets))
+           ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python314\Lib\asyncio\runners.py", line 204, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "C:\Python314\Lib\asyncio\runners.py", line 127, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Python314\Lib\asyncio\base_events.py", line 719, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "C:\AIPCoach\AI-Photographer-Coach-main\Backend\venv\Lib\site-packages\uvicorn\server.py", line 69, in serve
+    await self._serve(sockets)
+  File "C:\AIPCoach\AI-Photographer-Coach-main\Backend\venv\Lib\site-packages\uvicorn\server.py", line 76, in _serve
+    config.load()
+    ~~~~~~~~~~~^^
+  File "C:\AIPCoach\AI-Photographer-Coach-main\Backend\venv\Lib\site-packages\uvicorn\config.py", line 433, in load
+    self.loaded_app = import_from_string(self.app)
+                      ~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\AIPCoach\AI-Photographer-Coach-main\Backend\venv\Lib\site-packages\uvicorn\importer.py", line 22, in import_from_string
+    raise exc from None
+  File "C:\AIPCoach\AI-Photographer-Coach-main\Backend\venv\Lib\site-packages\uvicorn\importer.py", line 19, in import_from_string
+    module = importlib.import_module(module_str)
+  File "C:\Python314\Lib\importlib\__init__.py", line 88, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1398, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1371, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1342, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 938, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 759, in exec_module
+  File "<frozen importlib._bootstrap>", line 491, in _call_with_frames_removed
+  File "C:\AIPCoach\AI-Photographer-Coach-main\Backend\main.py", line 2, in <module>
+    from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+  File "C:\AIPCoach\AI-Photographer-Coach-main\Backend\venv\Lib\site-packages\fastapi\__init__.py", line 7, in <module>
+    from .applications import FastAPI as FastAPI
+  File "C:\AIPCoach\AI-Photographer-Coach-main\Backend\venv\Lib\site-packages\fastapi\applications.py", line 16, in <module>
+    from fastapi import routing
+  File "C:\AIPCoach\AI-Photographer-Coach-main\Backend\venv\Lib\site-packages\fastapi\routing.py", line 22, in <module>
+    from fastapi import params
+  File "C:\AIPCoach\AI-Photographer-Coach-main\Backend\venv\Lib\site-packages\fastapi\params.py", line 5, in <module>
+    from fastapi.openapi.models import Example
+  File "C:\AIPCoach\AI-Photographer-Coach-main\Backend\venv\Lib\site-packages\fastapi\openapi\models.py", line 4, in <module>
+    from fastapi._compat import (
+    ...<6 lines>...
+    )
+  File "C:\AIPCoach\AI-Photographer-Coach-main\Backend\venv\Lib\site-packages\fastapi\_compat.py", line 20, in <module>
+    from fastapi.exceptions import RequestErrorModel
+  File "C:\AIPCoach\AI-Photographer-Coach-main\Backend\venv\Lib\site-packages\fastapi\exceptions.py", line 3, in <module>
+    from pydantic import BaseModel, create_model
+  File "C:\AIPCoach\AI-Photographer-Coach-main\Backend\venv\Lib\site-packages\pydantic\__init__.py", line 395, in __getattr__
+    module = import_module(module_name, package=package)
+  File "C:\Python314\Lib\importlib\__init__.py", line 88, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\AIPCoach\AI-Photographer-Coach-main\Backend\venv\Lib\site-packages\pydantic\main.py", line 12, in <module>
+    import pydantic_core
+  File "C:\AIPCoach\AI-Photographer-Coach-main\Backend\venv\Lib\site-packages\pydantic_core\__init__.py", line 6, in <module>
+    from ._pydantic_core import (
+    ...<22 lines>...
+    )
+ModuleNotFoundError: No module named 'pydantic_core._pydantic_core'
