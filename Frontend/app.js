@@ -55,6 +55,10 @@ const downloadBtn       = document.querySelector("#downloadBtn");
 const onboardingOverlay = document.querySelector("#onboardingOverlay");
 const startAppBtn       = document.querySelector("#startAppBtn");
 
+// Lens switcher DOM refs
+const lensSwitcher = document.querySelector("#lensSwitcher");
+const lensStrip    = document.querySelector("#lensStrip");
+
 // ── App state ─────────────────────────────────────────────────────────────────
 let stream          = null;
 let socket          = null;
@@ -63,6 +67,15 @@ let inFlightFrames  = 0;
 let useHttpFallback = false;
 let isPaused        = false;
 let lastTiltAngle   = 0;
+
+// Camera switching state
+let availableCameras = []; // [{ deviceId, label, lensType, icon, sort, facing, displayLabel }]
+let activeDeviceId   = null;
+
+// Connection resilience
+let wsReconnectTimer  = null;
+let httpFailCount     = 0;
+const HTTP_FAIL_LIMIT = 3; // show "paused" only after 3 consecutive HTTP failures
 
 // Suggestion state machine
 let activeSuggestion  = null;  // { message, category, scoreAtStart, weakestAtStart }
@@ -88,13 +101,20 @@ function setStatus(message, state = "") {
 }
 
 function getBackendUrl() {
-  return backendUrlInput.value.trim().replace(/\/$/, "");
+  // If the page is served from the backend itself (same host, any IP),
+  // derive the API URL from window.location so mobile devices work
+  // without any manual IP configuration.
+  const override = backendUrlInput.value.trim().replace(/\/$/, "");
+  if (override && override !== "http://localhost:8000") return override;
+  // Use same origin: works for both laptop (localhost:8000) and mobile (192.168.x.x:8000)
+  return `${window.location.protocol}//${window.location.hostname}:8000`;
 }
 function getWebSocketUrl() {
-  const url    = new URL(getBackendUrl());
-  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-  url.pathname = "/ws/live";
-  url.search   = "";
+  const origin   = getBackendUrl();
+  const url      = new URL(origin);
+  url.protocol   = url.protocol === "https:" ? "wss:" : "ws:";
+  url.pathname   = "/ws/live";
+  url.search     = "";
   return url.toString();
 }
 
@@ -112,6 +132,147 @@ async function checkBackend() {
   }
 }
 
+// ── Lens classifier ───────────────────────────────────────────────────────────
+function classifyLens(label) {
+  const l = (label || "").toLowerCase();
+
+  const isFront = l.includes("front") || l.includes("user")
+    || l.includes("facetime") || l.includes("facing front")
+    || l.includes("selfie");
+  const facing = isFront ? "front" : "back";
+
+  if (isFront)
+    return { lensType: "front", icon: "🤳", sort: 0, facing };
+
+  if (l.includes("ultrawide") || l.includes("ultra wide")
+    || l.includes("ultra-wide") || l.includes("wide-angle")
+    || l.includes("wide angle") || /\b0\.[56]x?\b/.test(l))
+    return { lensType: "ultrawide", icon: "🔭", sort: 1, facing };
+
+  if (l.includes("telephoto") || l.includes("tele")
+    || l.includes("periscope") || l.includes("zoom")
+    || /\b[2-9](\.[\d]+)?x\b/.test(l) || /\b1[0-9]x\b/.test(l))
+    return { lensType: "telephoto", icon: "🔍", sort: 3, facing };
+
+  if (l.includes("macro"))
+    return { lensType: "macro", icon: "🌿", sort: 4, facing };
+
+  if (l.includes("depth") || l.includes("tof"))
+    return { lensType: "depth", icon: "📏", sort: 5, facing };
+
+  return { lensType: "main", icon: "📷", sort: 2, facing };
+}
+
+// ── Camera enumeration (call post-permission for real labels) ─────────────────
+async function enumerateCameras() {
+  try {
+    const devices      = await navigator.mediaDevices.enumerateDevices();
+    const videoDevices = devices.filter(d => d.kind === "videoinput");
+
+    console.log("[Lens Switcher] Raw video devices:",
+      videoDevices.map(d => ({ id: (d.deviceId || "").slice(0, 12), label: d.label })));
+
+    // Phase 1: classify
+    const cameras = videoDevices.map((d, i) => {
+      const { lensType, icon, sort, facing } = classifyLens(d.label);
+      return { deviceId: d.deviceId, label: d.label || `Camera ${i + 1}`, lensType, icon, sort, facing };
+    });
+
+    // Phase 2: reclassify
+    const frontCams = cameras.filter(c => c.facing === "front");
+    const backCams  = cameras.filter(c => c.facing === "back");
+
+    const mainBacks = backCams.filter(c => c.lensType === "main");
+    if (mainBacks.length > 1) {
+      for (let i = 1; i < mainBacks.length; i++) {
+        mainBacks[i].lensType = "telephoto";
+        mainBacks[i].icon     = "🔍";
+        mainBacks[i].sort     = 3;
+      }
+      console.log(`[Lens Switcher] Reclassified ${mainBacks.length - 1} extra back camera(s) as telephoto`);
+    }
+
+    // Keep only first front camera
+    const keptFront = frontCams.length > 0 ? [frontCams[0]] : [];
+    if (keptFront.length) {
+      keptFront[0].lensType = "selfie";
+      keptFront[0].icon     = "🤳";
+      keptFront[0].sort     = 0;
+    }
+
+    // Phase 3: sort + display labels
+    const all = [...keptFront, ...backCams];
+    all.sort((a, b) => a.sort - b.sort);
+
+    let backIndex = 0;
+    all.forEach(c => {
+      c.displayLabel = c.facing === "front" ? "selfie" : `cam${++backIndex}`;
+    });
+
+    console.log("[Lens Switcher] Final cameras:",
+      all.map(c => ({ label: c.label, type: c.lensType, display: c.displayLabel })));
+
+    availableCameras = all;
+    buildLensSwitcher();
+  } catch (e) {
+    console.warn("[Lens Switcher] enumerateCameras failed:", e);
+  }
+}
+
+// ── Lens switcher UI ──────────────────────────────────────────────────────────
+function buildLensSwitcher() {
+  if (!lensStrip || !lensSwitcher) return;
+  lensStrip.innerHTML = "";
+  if (availableCameras.length <= 1) {
+    lensSwitcher.classList.remove("visible");
+    return;
+  }
+  availableCameras.forEach(cam => {
+    const btn = document.createElement("button");
+    btn.className        = "lens-btn" + (cam.deviceId === activeDeviceId ? " active" : "");
+    btn.dataset.deviceId = cam.deviceId;
+    btn.title            = cam.label;
+    btn.innerHTML        = `<span class="lens-icon">${cam.icon}</span><span class="lens-label">${cam.displayLabel}</span>`;
+    btn.addEventListener("click", () => switchCamera(cam.deviceId));
+    lensStrip.appendChild(btn);
+  });
+  lensSwitcher.classList.add("visible");
+}
+
+// ── Switch camera ─────────────────────────────────────────────────────────────
+async function switchCamera(deviceId) {
+  if (deviceId === activeDeviceId) return;
+
+  if (captureTimer) { clearInterval(captureTimer); captureTimer = null; }
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        deviceId: { exact: deviceId },
+        width:  { ideal: 1280 },
+        height: { ideal: 720  },
+        frameRate: { min: TARGET_CAPTURE_FPS, ideal: 30 },
+      },
+      audio: false,
+    });
+    activeDeviceId = deviceId;
+    video.srcObject = stream;
+    await video.play();
+
+    // Update active button styling without full rebuild
+    lensStrip.querySelectorAll(".lens-btn").forEach(b => {
+      b.classList.toggle("active", b.dataset.deviceId === deviceId);
+    });
+
+    startCaptureLoop();
+  } catch (err) {
+    console.error("Failed to switch camera:", err);
+    coachMessage.textContent = "Could not switch lens. Reverting…";
+    startCamera();
+  }
+}
+
 // ── Camera ────────────────────────────────────────────────────────────────────
 async function startCamera() {
   if (stream) return;
@@ -120,17 +281,26 @@ async function startCamera() {
       video: {
         facingMode: { ideal: "environment" },
         width:  { ideal: 1280 },
-        height: { ideal: 720 },
+        height: { ideal: 720  },
         frameRate: { min: TARGET_CAPTURE_FPS, ideal: 30 },
       },
       audio: false,
     });
+
+    // Record which device was actually selected
+    const track = stream.getVideoTracks()[0];
+    if (track) activeDeviceId = track.getSettings().deviceId || null;
+
     video.srcObject = stream;
     await video.play();
     cameraButton.textContent = "📷 Camera On";
     cameraButton.disabled    = true;
     captureButton.disabled   = false;
     coachMessage.textContent = "Analyzing frame…";
+
+    // Enumerate cameras now that we have permission (labels will be visible)
+    await enumerateCameras();
+
     startCaptureLoop();
   } catch (err) {
     readyState.textContent   = "Camera blocked";
@@ -141,6 +311,9 @@ async function startCamera() {
 
 // ── WebSocket ─────────────────────────────────────────────────────────────────
 function connectSocket() {
+  // Cancel any pending reconnect attempt
+  if (wsReconnectTimer) { clearTimeout(wsReconnectTimer); wsReconnectTimer = null; }
+
   if (socket && [WebSocket.OPEN, WebSocket.CONNECTING].includes(socket.readyState)) {
     socket.close();
   }
@@ -148,21 +321,42 @@ function connectSocket() {
   socket          = new WebSocket(getWebSocketUrl());
   setStatus("Connecting…", "warning");
 
-  socket.addEventListener("open",    () => setStatus("Connected via WebSocket", "ready"));
+  socket.addEventListener("open", () => {
+    setStatus("Connected via WebSocket", "ready");
+    useHttpFallback = false;
+    httpFailCount   = 0;
+  });
+
   socket.addEventListener("message", (event) => {
     inFlightFrames = Math.max(0, inFlightFrames - 1);
     const payload  = JSON.parse(event.data);
     if (payload.error) {
-      readyState.textContent   = "Error";
+      readyState.textContent = "Error";
       readyState.classList.remove("ready");
       coachMessage.textContent = payload.error;
       return;
     }
+    httpFailCount = 0; // any successful WS response resets the failure counter
     if (!isPaused) renderCoach(payload);
   });
-  socket.addEventListener("close", () => { inFlightFrames = 0; useHttpFallback = true; setStatus("Connected via HTTP", "ready"); });
-  socket.addEventListener("error", () => { useHttpFallback = true; setStatus("Connected via HTTP", "ready"); });
+
+  // On close: use HTTP as bridge, schedule WS reconnect in 5 s
+  socket.addEventListener("close", () => {
+    inFlightFrames  = 0;
+    useHttpFallback = true;
+    setStatus("Reconnecting…", "warning");
+    wsReconnectTimer = setTimeout(() => {
+      if (stream) connectSocket(); // only reconnect while camera is active
+    }, 5000);
+  });
+
+  // On error: HTTP fallback kicks in; close event will schedule reconnect
+  socket.addEventListener("error", () => {
+    useHttpFallback = true;
+    setStatus("Using HTTP fallback…", "warning");
+  });
 }
+
 
 // ── Capture loop ──────────────────────────────────────────────────────────────
 function startCaptureLoop() {
@@ -207,11 +401,18 @@ async function sendFrameOverHttp(payload) {
     if (!res.ok || result.error) throw new Error(result.error || `${res.status}`);
     if (!isPaused) renderCoach(result);
     setStatus("Connected via HTTP", "ready");
+    httpFailCount = 0; // reset on success
   } catch {
-    setStatus("Backend offline", "error");
-    readyState.textContent   = "Disconnected";
-    readyState.classList.remove("ready");
-    coachMessage.textContent = "AI Analysis paused. Connect to the backend.";
+    httpFailCount++;
+    if (httpFailCount >= HTTP_FAIL_LIMIT) {
+      setStatus("Backend offline", "error");
+      readyState.textContent = "Disconnected";
+      readyState.classList.remove("ready");
+      coachMessage.textContent = "AI Analysis paused. Connect to the backend.";
+    } else {
+      // Transient failure — stay quiet and retry next frame
+      setStatus(`HTTP retry (${httpFailCount}/${HTTP_FAIL_LIMIT})…`, "warning");
+    }
   } finally {
     inFlightFrames = Math.max(0, inFlightFrames - 1);
   }
@@ -463,5 +664,6 @@ connectButton.addEventListener("click", async () => {
 });
 cameraButton.addEventListener("click", startCamera);
 
-// ── Boot ──────────────────────────────────────────────────────────────────────
+// ── Boot ─────────────────────────────────────────────────────────────────────
 checkBackend().then(ok => { if (ok) connectSocket(); });
+// enumerateCameras() runs inside startCamera() after permission is granted

@@ -4,8 +4,11 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>AI Photographer Coach</title>
-    <meta name="description" content="AI-powered real-time photography coach with instant framing, lighting, and composition feedback." />
-    <meta name="theme-color" content="#07070d" />
+    <meta name="description" content="Real-time AI photography coach with instant framing, lighting, and composition feedback." />
+    <meta name="theme-color" content="#0e0d0b" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -52,6 +55,11 @@
         <video id="camera" autoplay playsinline muted></video>
         <canvas id="frameCanvas" width="640" height="480" aria-hidden="true"></canvas>
         <canvas id="captureCanvas" width="1280" height="720" aria-hidden="true"></canvas>
+
+        <!-- Lens Switcher -->
+        <div id="lensSwitcher" class="lens-switcher" aria-label="Lens selection">
+          <div id="lensStrip" class="lens-strip"></div>
+        </div>
 
         <!-- Rotation HUD (top-right corner) -->
         <div class="rotation-hud" id="rotationHud">
